@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ObrasNav</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0e1018;--s1:#181b27;--s2:#1f2235;--acc:#f5a623;--grn:#3ecf72;--red:#e05c6e;--txt:#edf0f9;--mut:#6e748f;--brd:#2a2f47}
+html,body{height:100%;font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);overflow:hidden}
+#app{display:flex;flex-direction:column;height:100svh}
+
+#hd{flex-shrink:0;background:var(--s1);border-bottom:1px solid var(--brd);padding:11px 14px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:17px;font-weight:800}.logo em{color:var(--acc);font-style:normal}
+
+#tabs{flex-shrink:0;display:flex;background:var(--s1);border-bottom:1px solid var(--brd)}
+.tb{flex:1;padding:10px 2px;border:none;background:none;color:var(--mut);font-size:12px;font-weight:700;cursor:pointer;border-bottom:2px solid transparent}
+.tb.on{color:var(--acc);border-bottom-color:var(--acc)}
+
+#ct{flex:1;overflow:hidden;position:relative;min-height:0}
+.pn{position:absolute;inset:0;display:none;flex-direction:column}
+.pn.on{display:flex}
+
+/* MAPA */
+#mapaDiv{flex:1;min-height:0;position:relative}
+#leafletMap{position:absolute;inset:0;width:100%;height:100%}
+#mapBar{flex-shrink:0;background:var(--s1);border-top:1px solid var(--brd);padding:8px 10px;display:flex;gap:7px;align-items:center}
+#mapInfo{flex:1;font-size:11px;color:var(--mut)}
+#pinMsg{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:1000;background:var(--acc);color:#000;font-size:12px;font-weight:800;padding:7px 16px;border-radius:20px;pointer-events:none;display:none;white-space:nowrap}
+#pinMsg.on{display:block}
+
+/* OBRAS */
+.ph{flex-shrink:0;padding:12px 14px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ph h2{font-size:15px;font-weight:800}
+.ph-r{display:flex;align-items:center;gap:6px}
+.badge{background:var(--acc);color:#000;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+.sc{flex:1;overflow-y:auto;padding:0 10px 16px}
+
+#selBar{flex-shrink:0;background:#1a0a0a;border-bottom:1px solid rgba(224,92,110,.3);padding:8px 14px;display:none;align-items:center;justify-content:space-between}
+#selBar.on{display:flex}
+#selInfo{font-size:12px;font-weight:700;color:var(--red)}
+
+.card{background:var(--s1);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:9px;position:relative}
+.card.em-rota{border-color:var(--acc)}
+.card.marcada{border-color:var(--red);background:#180e0e}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px}
+.card-nome{font-size:14px;font-weight:800}
+.chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;flex-shrink:0}
+.card-info{font-size:11px;color:var(--mut);line-height:1.7;margin-bottom:8px}
+.card-btns{display:flex;gap:5px;flex-wrap:wrap}
+.checksel{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;border:2px solid var(--brd);background:var(--s2);display:none;align-items:center;justify-content:center;font-size:13px;font-weight:900}
+.sel-mode .checksel{display:flex}
+.sel-mode .card-btns{display:none}
+.card.marcada .checksel{background:var(--red);border-color:var(--red);color:#fff}
+
+/* ROTA */
+.ri{background:var(--s1);border:1px solid var(--brd);border-radius:10px;padding:11px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.rnum{width:27px;height:27px;border-radius:50%;background:var(--acc);color:#000;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rinfo{flex:1;min-width:0}.rinfo b{font-size:13px;display:block}.rinfo small{font-size:11px;color:var(--mut)}
+.rdel{background:none;border:none;color:var(--red);font-size:20px;cursor:pointer;padding:0 4px}
+.rfoot{flex-shrink:0;padding:10px;border-top:1px solid var(--brd);display:flex;gap:7px}
+
+/* MODAL */
+#mb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:flex-end}
+#mb.on{display:flex}
+.mo{background:var(--s1);border-radius:18px 18px 0 0;padding:20px 16px 34px;width:100%;max-height:88svh;overflow-y:auto;animation:up .2s ease}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.mo h3{font-size:17px;font-weight:800;margin-bottom:14px}
+.fg{margin-bottom:11px}
+.fg label{font-size:10px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px}
+.fg input,.fg select,.fg textarea{width:100%;background:var(--s2);border:1px solid var(--brd);border-radius:8px;padding:10px 11px;color:var(--txt);font-size:14px;outline:none;font-family:inherit;-webkit-appearance:none;appearance:none}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--acc)}
+.fg textarea{resize:none;height:64px}
+.fg select option{background:var(--s2)}
+.hint{font-size:10px;color:var(--mut);margin-top:3px}
+.mrow{display:flex;gap:8px;margin-top:8px}
+
+/* BOTÕES */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:9px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:inherit;text-decoration:none;white-space:nowrap;line-height:1}
+.btn:active{opacity:.65}
+.ba{background:var(--acc);color:#000}
+.bg{background:var(--grn);color:#000;flex:1}
+.bm{background:#4285f4;color:#fff}
+.bm2{background:#4285f4;color:#fff;flex:1}
+.bw{background:#25d366;color:#fff}
+.bs{background:var(--s2);color:var(--txt);border:1px solid var(--brd)}
+.bx{background:none;color:var(--mut);border:1px solid var(--brd)}
+.bd{background:rgba(224,92,110,.12);color:var(--red);border:1px solid rgba(224,92,110,.25)}
+.bdel{background:var(--red);color:#fff}
+.sm{padding:6px 10px;font-size:11px;border-radius:6px}
+.fl{flex:1}
+
+.empty{text-align:center;padding:40px 16px;color:var(--mut);font-size:13px;line-height:1.8}
+.empty .ic{font-size:36px;margin-bottom:8px}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px}
+
+/* Leaflet popup dark */
+.leaflet-popup-content-wrapper{background:var(--s2);color:var(--txt);border:1px solid var(--brd);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.6)}
+.leaflet-popup-tip{background:var(--s2)}
+.leaflet-popup-close-button{color:var(--mut)!important;font-size:16px!important}
+.leaflet-popup-content{margin:12px 14px;font-family:system-ui,sans-serif}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="hd">
+    <div class="logo">Obras<em>Nav</em></div>
+    <button class="btn ba sm" onclick="novaObra()">＋ Nova Obra</button>
+  </div>
+
+  <div id="tabs">
+    <button class="tb on" id="tb0" onclick="aba(0)">🗺 Mapa</button>
+    <button class="tb"    id="tb1" onclick="aba(1)">🏗 Obras</button>
+    <button class="tb"    id="tb2" onclick="aba(2)">🧭 Rota</button>
+  </div>
+
+  <div id="ct">
+
+    <!-- MAPA -->
+    <div class="pn on" id="pn0">
+      <div id="mapaDiv">
+        <div id="leafletMap"></div>
+        <div id="pinMsg">📍 Toque no mapa para marcar a obra...</div>
+      </div>
+      <div id="mapBar">
+        <span id="mapInfo">Aguardando mapa...</span>
+        <button class="btn bs sm" onclick="irParaMim()">📍 Minha posição</button>
+        <button class="btn ba sm" id="btnPin" onclick="togglePin()">➕ Marcar obra</button>
+      </div>
+    </div>
+
+    <!-- OBRAS -->
+    <div class="pn" id="pn1">
+      <div id="selBar">
+        <span id="selInfo">0 selecionada(s)</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn bx sm" onclick="cancelarSel()">Cancelar</button>
+          <button class="btn bdel sm" onclick="excluirMarcadas()">🗑 Excluir</button>
+        </div>
+      </div>
+      <div class="ph">
+        <h2>Obras</h2>
+        <div class="ph-r">
+          <span class="badge" id="cnt">0</span>
+          <button class="btn bd sm" id="btnSel" onclick="toggleSel()">☑ Selecionar</button>
+        </div>
+      </div>
+      <div class="sc" id="listaObras"></div>
+    </div>
+
+    <!-- ROTA -->
+    <div class="pn" id="pn2">
+      <div class="ph"><h2>Rota do dia</h2></div>
+      <div class="sc" id="listaRota"></div>
+      <div class="rfoot">
+        <button class="btn bx sm" onclick="limparRota()">Limpar</button>
+        <button class="btn bg" onclick="irWaze()">🚗 Waze</button>
+        <button class="btn bm2" onclick="irMaps()">📱 Google Maps</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="mb">
+  <div class="mo">
+    <h3 id="mTit">Nova Obra</h3>
+    <div class="fg"><label>Nome / Cliente *</label><input id="fNome" placeholder="Ex: Residência João Silva"></div>
+    <div class="fg">
+      <label>Endereço completo</label>
+      <input id="fEnd" placeholder="Rua, número, bairro, cidade">
+      <div class="hint">Preencha o endereço para navegação via Maps/Waze.</div>
+    </div>
+    <div class="fg"><label>Telefone</label><input id="fTel" type="tel" placeholder="(00) 00000-0000"></div>
+    <div class="fg"><label>Tipo de serviço</label><input id="fTipo" placeholder="Ex: Janelas, portas..."></div>
+    <div class="fg">
+      <label>Status</label>
+      <select id="fSt"><option value="p">Pendente</option><option value="a">Em andamento</option><option value="c">Concluída</option></select>
+    </div>
+    <div class="fg"><label>Anotações</label><textarea id="fNota" placeholder="Observações..."></textarea></div>
+    <div class="fg">
+      <label>Localização no mapa</label>
+      <div id="coordBox" style="background:var(--s2);border:1px dashed var(--brd);border-radius:8px;padding:9px 11px;font-size:12px;color:var(--mut);display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span id="coordTxt">Sem pin — use o botão ➕ no mapa para marcar</span>
+        <button class="btn bs sm" onclick="pinDoModal()">🗺 Marcar</button>
+      </div>
+    </div>
+    <div class="mrow">
+      <button class="btn bx fl" onclick="fecharModal()">Cancelar</button>
+      <button class="btn ba fl" onclick="salvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ══════════════════════════════════════════
+// ESTADO
+// ══════════════════════════════════════════
+var obras = [], rota = [], editId = null;
+var selMode = false, marcadas = [];
+var pinMode = false, coordPendente = null;
+var mapa = null, pins = {}, meuPin = null;
+
+function carregar() {
+  try { obras = JSON.parse(localStorage.getItem('on4_obras') || '[]'); } catch(e){ obras=[]; }
+  try { rota  = JSON.parse(localStorage.getItem('on4_rota')  || '[]'); } catch(e){ rota=[];  }
+}
+function salvarLS() {
+  localStorage.setItem('on4_obras', JSON.stringify(obras));
+  localStorage.setItem('on4_rota',  JSON.stringify(rota));
+}
+carregar();
+
+// ══════════════════════════════════════════
+// MAPA — Leaflet + OpenStreetMap
+// ══════════════════════════════════════════
+function initMapa() {
+  if (mapa) return;
+
+  mapa = L.map('leafletMap', { zoomControl: true, tap: false })
+           .setView([-15.8, -47.9], 5);
+
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19
+  }).addTo(mapa);
+
+  mapa.on('click', function(e) {
+    if (!pinMode) return;
+    coordPendente = [e.latlng.lat, e.latlng.lng];
+    pararPin();
+    mostrarCoord(coordPendente);
+    abrirModal(editId); // reabre o modal com a coord já preenchida
+  });
+
+  setTimeout(function(){ mapa.invalidateSize(true); }, 150);
+  renderPins();
+  document.getElementById('mapInfo').textContent = 'Mapa carregado. Toque ➕ para marcar obras.';
+}
+
+function fixMapa() {
+  if (!mapa) { initMapa(); return; }
+  setTimeout(function(){ mapa.invalidateSize(true); }, 80);
+}
+
+function mkIcon(cor, lbl) {
+  return L.divIcon({
+    className: '',
+    iconSize: [32,42], iconAnchor: [16,42], popupAnchor: [0,-44],
+    html: '<svg width="32" height="42" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">'
+        + '<path d="M16 0C7.2 0 0 7.2 0 16c0 12 16 26 16 26S32 28 32 16C32 7.2 24.8 0 16 0z" fill="' + cor + '"/>'
+        + '<text x="16" y="21" text-anchor="middle" fill="#000" font-size="12" font-weight="900" font-family="sans-serif">' + lbl + '</text>'
+        + '</svg>'
+  });
+}
+
+function renderPins() {
+  if (!mapa) return;
+  Object.values(pins).forEach(function(m){ m.remove(); });
+  pins = {};
+  obras.forEach(function(o) {
+    if (!o.lat || !o.lng) return;
+    var ri = rota.indexOf(o.id);
+    var cor = ri >= 0 ? '#f5a623' : '#3ecf72';
+    var lbl = ri >= 0 ? String(ri+1) : '●';
+    var m = L.marker([o.lat, o.lng], { icon: mkIcon(cor, lbl) }).addTo(mapa);
+    m.bindPopup(mkPopup(o));
+    pins[o.id] = m;
+  });
+  var c = Object.keys(pins).length;
+  document.getElementById('mapInfo').textContent = c > 0 ? c + ' obra(s) no mapa' : 'Toque ➕ para marcar obras';
+}
+
+function mkPopup(o) {
+  var navUrl = o.end
+    ? 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(o.end) + '&travelmode=driving'
+    : (o.lat ? 'https://www.google.com/maps/dir/?api=1&destination=' + o.lat + ',' + o.lng + '&travelmode=driving' : '');
+  var navBtn = navUrl
+    ? '<a href="' + navUrl + '" target="_blank" style="background:#4285f4;color:#fff;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;text-decoration:none;display:inline-block">🧭 Ir até aqui</a>'
+    : '';
+  var rotaBtn = '<button onclick="addRota(\'' + o.id + '\')" style="background:#f5a623;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;color:#000">'
+    + (rota.indexOf(o.id)>=0 ? '✅ Na rota' : '＋ Rota') + '</button>';
+  return '<div style="min-width:180px">'
+    + '<div style="font-size:14px;font-weight:800;margin-bottom:3px">' + esc(o.nome) + '</div>'
+    + (o.end ? '<div style="font-size:11px;color:#9196b0;margin-bottom:2px">📍 ' + esc(o.end) + '</div>' : '')
+    + (o.tipo ? '<div style="font-size:11px;color:#9196b0;margin-bottom:6px">🔧 ' + esc(o.tipo) + '</div>' : '')
+    + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">'
+    + rotaBtn + navBtn
+    + '</div></div>';
+}
+
+function irParaMim() {
+  if (!navigator.geolocation) { alert('GPS não disponível.'); return; }
+  document.getElementById('mapInfo').textContent = 'Buscando sua posição...';
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var ll = [pos.coords.latitude, pos.coords.longitude];
+    mapa.setView(ll, 15);
+    if (meuPin) meuPin.remove();
+    meuPin = L.circleMarker(ll, {radius:10, color:'#fff', weight:2, fillColor:'#3ecf72', fillOpacity:1})
+      .addTo(mapa).bindPopup('📍 Você está aqui').openPopup();
+    document.getElementById('mapInfo').textContent = 'Sua posição encontrada';
+  }, function(){
+    document.getElementById('mapInfo').textContent = 'Não foi possível obter posição';
+  });
+}
+
+function togglePin() {
+  if (pinMode) pararPin(); else iniciarPin();
+}
+function iniciarPin() {
+  pinMode = true;
+  document.getElementById('btnPin').textContent = '❌ Cancelar';
+  document.getElementById('btnPin').className = 'btn bd sm';
+  document.getElementById('pinMsg').classList.add('on');
+}
+function pararPin() {
+  pinMode = false;
+  document.getElementById('btnPin').textContent = '➕ Marcar obra';
+  document.getElementById('btnPin').className = 'btn ba sm';
+  document.getElementById('pinMsg').classList.remove('on');
+}
+
+// ══════════════════════════════════════════
+// ABAS
+// ══════════════════════════════════════════
+function aba(n) {
+  for (var i = 0; i < 3; i++) {
+    document.getElementById('tb'+i).classList.toggle('on', i===n);
+    document.getElementById('pn'+i).classList.toggle('on', i===n);
+  }
+  if (n === 0) fixMapa();
+}
+
+// ══════════════════════════════════════════
+// MODAL
+// ══════════════════════════════════════════
+function novaObra() { coordPendente = null; abrirModal(null); }
+
+function abrirModal(id) {
+  editId = id;
+  document.getElementById('mTit').textContent = id ? 'Editar Obra' : 'Nova Obra';
+  var o = id ? obras.find(function(x){ return x.id===id; }) : null;
+  document.getElementById('fNome').value = o ? (o.nome||'')  : '';
+  document.getElementById('fEnd').value  = o ? (o.end||'')   : '';
+  document.getElementById('fTel').value  = o ? (o.tel||'')   : '';
+  document.getElementById('fTipo').value = o ? (o.tipo||'')  : '';
+  document.getElementById('fSt').value   = o ? (o.status||'p'): 'p';
+  document.getElementById('fNota').value = o ? (o.nota||'')  : '';
+  // coord: usa pendente (vinda do mapa) ou da obra existente
+  if (coordPendente) {
+    mostrarCoord(coordPendente);
+  } else if (o && o.lat) {
+    coordPendente = [o.lat, o.lng];
+    mostrarCoord(coordPendente);
+  } else {
+    resetarCoord();
+  }
+  document.getElementById('mb').classList.add('on');
+}
+
+function fecharModal() {
+  document.getElementById('mb').classList.remove('on');
+  editId = null; coordPendente = null; resetarCoord();
+}
+
+function pinDoModal() {
+  // salva dados atuais do modal para recuperar depois
+  fecharModal();
+  aba(0);
+  iniciarPin();
+}
+
+function mostrarCoord(c) {
+  var box = document.getElementById('coordBox');
+  box.style.borderColor = 'var(--grn)';
+  document.getElementById('coordTxt').style.color = 'var(--grn)';
+  document.getElementById('coordTxt').textContent = '✅ ' + c[0].toFixed(5) + ', ' + c[1].toFixed(5);
+}
+function resetarCoord() {
+  var box = document.getElementById('coordBox');
+  box.style.borderColor = '';
+  document.getElementById('coordTxt').style.color = '';
+  document.getElementById('coordTxt').textContent = 'Sem pin — use o botão ➕ no mapa para marcar';
+}
+
+function salvar() {
+  var nome = document.getElementById('fNome').value.trim();
+  if (!nome) { alert('Informe o nome ou cliente.'); return; }
+  var d = {
+    nome:   nome,
+    end:    document.getElementById('fEnd').value.trim(),
+    tel:    document.getElementById('fTel').value.trim(),
+    tipo:   document.getElementById('fTipo').value.trim(),
+    status: document.getElementById('fSt').value,
+    nota:   document.getElementById('fNota').value.trim(),
+    lat:    coordPendente ? coordPendente[0] : null,
+    lng:    coordPendente ? coordPendente[1] : null
+  };
+  if (editId) {
+    var idx = obras.findIndex(function(x){ return x.id===editId; });
+    if (idx >= 0) obras[idx] = Object.assign(obras[idx], d);
+  } else {
+    d.id = 'o' + Date.now();
+    obras.push(d);
+  }
+  salvarLS(); renderTudo(); fecharModal();
+}
+
+// ══════════════════════════════════════════
+// EXCLUIR
+// ══════════════════════════════════════════
+function excluir(id) {
+  if (!confirm('Remover esta obra?')) return;
+  obras = obras.filter(function(o){ return o.id !== id; });
+  rota  = rota.filter(function(r){ return r !== id; });
+  salvarLS(); renderTudo();
+}
+
+function toggleSel() {
+  selMode = !selMode;
+  marcadas = [];
+  document.getElementById('selBar').classList.toggle('on', selMode);
+  document.getElementById('btnSel').textContent = selMode ? '✕ Cancelar' : '☑ Selecionar';
+  renderObras();
+}
+function cancelarSel() {
+  selMode = false; marcadas = [];
+  document.getElementById('selBar').classList.remove('on');
+  document.getElementById('btnSel').textContent = '☑ Selecionar';
+  renderObras();
+}
+function marcarCard(id) {
+  if (!selMode) return;
+  var i = marcadas.indexOf(id);
+  if (i >= 0) marcadas.splice(i,1); else marcadas.push(id);
+  document.getElementById('selInfo').textContent = marcadas.length + ' selecionada(s)';
+  renderObras();
+}
+function excluirMarcadas() {
+  if (!marcadas.length) { alert('Selecione ao menos uma obra.'); return; }
+  if (!confirm('Excluir ' + marcadas.length + ' obra(s)?')) return;
+  obras = obras.filter(function(o){ return marcadas.indexOf(o.id) < 0; });
+  rota  = rota.filter(function(r){ return marcadas.indexOf(r) < 0; });
+  salvarLS(); cancelarSel(); renderTudo();
+}
+
+// ══════════════════════════════════════════
+// LISTA OBRAS
+// ══════════════════════════════════════════
+var SL = {p:'Pendente', a:'Em andamento', c:'Concluída'};
+var SC = {
+  p:'background:rgba(245,166,35,.18);color:#f5a623',
+  a:'background:rgba(62,207,114,.18);color:#3ecf72',
+  c:'background:rgba(110,116,143,.18);color:#6e748f'
+};
+
+function renderObras() {
+  document.getElementById('cnt').textContent = obras.length;
+  var el = document.getElementById('listaObras');
+  if (selMode) el.classList.add('sel-mode'); else el.classList.remove('sel-mode');
+
+  if (!obras.length) {
+    el.innerHTML = '<div class="empty"><div class="ic">🏗</div>Nenhuma obra.<br>Toque em <b>+ Nova Obra</b>.</div>';
+    return;
+  }
+
+  el.innerHTML = obras.map(function(o) {
+    var naRota   = rota.indexOf(o.id) >= 0;
+    var marcada  = marcadas.indexOf(o.id) >= 0;
+    var cls = 'card' + (naRota?' em-rota':'') + (marcada?' marcada':'');
+    var dest = o.end || (o.lat ? (o.lat+','+o.lng) : '');
+    var navBtn = dest
+      ? '<a href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest) + '&travelmode=driving" target="_blank" class="btn bm sm">🧭 Navegar</a>'
+      : '';
+    var waBtn = o.tel
+      ? '<a href="https://wa.me/55' + o.tel.replace(/\D/g,'') + '" target="_blank" class="btn bw sm">💬</a>'
+      : '';
+    return '<div class="' + cls + '" onclick="marcarCard(\'' + o.id + '\')">'
+      + '<div class="checksel">' + (marcada ? '✓' : '') + '</div>'
+      + '<div class="card-top">'
+      + '<div class="card-nome">' + esc(o.nome) + '</div>'
+      + '<span class="chip" style="' + SC[o.status] + '">' + SL[o.status] + '</span>'
+      + '</div>'
+      + '<div class="card-info">'
+      + (o.end  ? '📍 ' + esc(o.end)  + '<br>' : (o.lat ? '📍 pin no mapa<br>' : '<span style="color:#e05c6e">⚠️ Sem localização</span><br>'))
+      + (o.tipo ? '🔧 ' + esc(o.tipo) + '<br>' : '')
+      + (o.tel  ? '📞 ' + esc(o.tel)            : '')
+      + '</div>'
+      + '<div class="card-btns">'
+      + '<button class="btn bs sm" onclick="event.stopPropagation();addRota(\'' + o.id + '\')">' + (naRota ? '✅ Na rota' : '＋ Rota') + '</button>'
+      + (o.lat ? '<button class="btn bs sm" onclick="event.stopPropagation();verNoMapa(\'' + o.id + '\')">🗺 Ver mapa</button>' : '')
+      + navBtn
+      + '<button class="btn bx sm" onclick="event.stopPropagation();abrirModal(\'' + o.id + '\')">✏️</button>'
+      + '<button class="btn bd sm" onclick="event.stopPropagation();excluir(\'' + o.id + '\')">🗑</button>'
+      + waBtn
+      + '</div></div>';
+  }).join('');
+}
+
+function verNoMapa(id) {
+  var o = obras.find(function(x){ return x.id===id; });
+  if (!o || !o.lat) return;
+  aba(0);
+  setTimeout(function(){
+    mapa.setView([o.lat, o.lng], 17);
+    if (pins[id]) pins[id].openPopup();
+  }, 200);
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ══════════════════════════════════════════
+// ROTA
+// ══════════════════════════════════════════
+function addRota(id) {
+  var i = rota.indexOf(id);
+  if (i >= 0) rota.splice(i,1); else rota.push(id);
+  salvarLS(); renderTudo(); aba(2);
+}
+function remRota(id) {
+  rota = rota.filter(function(r){ return r!==id; });
+  salvarLS(); renderTudo();
+}
+function limparRota() {
+  if (!rota.length || confirm('Limpar rota?')) { rota=[]; salvarLS(); renderTudo(); }
+}
+
+function renderRota() {
+  var el = document.getElementById('listaRota');
+  var items = rota.map(function(id){ return obras.find(function(o){ return o.id===id; }); }).filter(Boolean);
+
+  if (!items.length) {
+    el.innerHTML = '<div class="empty"><div class="ic">🧭</div>Nenhuma obra na rota.<br>Adicione na aba <b>Obras</b>.</div>';
+    return;
+  }
+
+  var semLoc = items.filter(function(o){ return !o.end && !o.lat; });
+  var aviso = semLoc.length
+    ? '<div style="background:rgba(224,92,110,.1);border:1px solid rgba(224,92,110,.3);border-radius:8px;padding:10px;font-size:12px;color:var(--red);margin-bottom:10px">⚠️ Sem localização: '
+      + semLoc.map(function(o){ return esc(o.nome); }).join(', ') + '</div>'
+    : '';
+
+  el.innerHTML = aviso + items.map(function(o, i){
+    var loc = o.end || (o.lat ? (o.lat.toFixed(4)+', '+o.lng.toFixed(4)) : '⚠️ sem localização');
+    return '<div class="ri">'
+      + '<div class="rnum">' + (i+1) + '</div>'
+      + '<div class="rinfo"><b>' + esc(o.nome) + '</b><small>' + esc(loc) + '</small></div>'
+      + '<button class="rdel" onclick="remRota(\'' + o.id + '\')">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+// ══════════════════════════════════════════
+// NAVEGAÇÃO
+// ══════════════════════════════════════════
+function getRotaComLoc() {
+  return rota
+    .map(function(id){ return obras.find(function(o){ return o.id===id; }); })
+    .filter(function(o){ return o && (o.end || o.lat); });
+}
+
+function toParam(o) {
+  return o.end ? encodeURIComponent(o.end) : (o.lat + ',' + o.lng);
+}
+
+function abrirUrl(url) {
+  var a = document.createElement('a');
+  a.href = url; a.target = '_blank'; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function irMaps() {
+  var items = getRotaComLoc();
+  if (!items.length) { alert('Adicione obras com endereço ou pin à rota.'); return; }
+
+  var url;
+  if (items.length === 1) {
+    url = 'https://www.google.com/maps/dir/?api=1'
+        + '&origin=My+Location'
+        + '&destination=' + toParam(items[0])
+        + '&travelmode=driving';
+  } else {
+    var waypoints = items.slice(0, items.length-1).map(toParam).join('|');
+    url = 'https://www.google.com/maps/dir/?api=1'
+        + '&origin=My+Location'
+        + '&destination=' + toParam(items[items.length-1])
+        + '&waypoints=' + waypoints
+        + '&travelmode=driving';
+  }
+  abrirUrl(url);
+}
+
+function irWaze() {
+  var items = getRotaComLoc();
+  if (!items.length) { alert('Adicione obras com endereço ou pin à rota.'); return; }
+  var dest = items[items.length-1];
+  var url = dest.end
+    ? 'https://waze.com/ul?q=' + encodeURIComponent(dest.end) + '&navigate=yes'
+    : 'https://waze.com/ul?ll=' + dest.lat + ',' + dest.lng + '&navigate=yes';
+  abrirUrl(url);
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+function renderTudo() { renderObras(); renderRota(); renderPins(); }
+
+window.addEventListener('load', function(){
+  initMapa();
+  renderTudo();
+});
+</script>
+</body>
+</html>
