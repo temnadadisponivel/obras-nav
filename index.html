@@ -183,6 +183,14 @@ html,body{height:100%;font-family:system-ui,-apple-system,sans-serif;background:
     </div>
     <div class="fg"><label>Anotações</label><textarea id="fNota" placeholder="Observações..."></textarea></div>
     <div class="fg">
+      <label>Foto do local</label>
+      <div id="fotoBox" style="background:var(--s2);border:1px dashed var(--brd);border-radius:8px;padding:9px 11px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="document.getElementById('fotoInput').click()">
+        <div id="fotoPreview" style="width:56px;height:56px;border-radius:6px;background:var(--s3);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden">📷</div>
+        <div style="font-size:12px;color:var(--mut)">Toque para tirar foto ou escolher da galeria</div>
+      </div>
+      <input type="file" id="fotoInput" accept="image/*" capture="environment" style="display:none" onchange="carregarFoto(this)">
+    </div>
+    <div class="fg">
       <label>Localização no mapa</label>
       <div id="coordBox" style="background:var(--s2);border:1px dashed var(--brd);border-radius:8px;padding:9px 11px;font-size:12px;color:var(--mut);display:flex;align-items:center;justify-content:space-between;gap:8px">
         <span id="coordTxt">Sem pin — use o botão ➕ no mapa para marcar</span>
@@ -301,11 +309,26 @@ function irParaMim() {
     mapa.setView(ll, 15);
     if (meuPin) meuPin.remove();
     meuPin = L.circleMarker(ll, {radius:10, color:'#fff', weight:2, fillColor:'#3ecf72', fillOpacity:1})
-      .addTo(mapa).bindPopup('📍 Você está aqui').openPopup();
-    document.getElementById('mapInfo').textContent = 'Sua posição encontrada';
+      .addTo(mapa)
+      .bindPopup(
+        '<div style="min-width:160px">'
+        + '<div style="font-weight:800;margin-bottom:8px">📍 Você está aqui</div>'
+        + '<button onclick="cadastrarAqui(' + ll[0] + ',' + ll[1] + ')" '
+        + 'style="background:#f5a623;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;color:#000;width:100%">'
+        + '🏗 Cadastrar obra aqui</button>'
+        + '</div>'
+      )
+      .openPopup();
+    document.getElementById('mapInfo').textContent = 'Toque no pin para cadastrar obra aqui';
   }, function(){
     document.getElementById('mapInfo').textContent = 'Não foi possível obter posição';
   });
+}
+
+function cadastrarAqui(lat, lng) {
+  coordPendente = [lat, lng];
+  mapa.closePopup();
+  abrirModal(null);
 }
 
 function togglePin() {
@@ -343,6 +366,8 @@ function novaObra() { coordPendente = null; abrirModal(null); }
 function abrirModal(id) {
   editId = id;
   document.getElementById('mTit').textContent = id ? 'Editar Obra' : 'Nova Obra';
+  fotoBase64 = null;
+  document.getElementById('fotoInput').value = '';
   var o = id ? obras.find(function(x){ return x.id===id; }) : null;
   document.getElementById('fNome').value = o ? (o.nome||'')  : '';
   document.getElementById('fEnd').value  = o ? (o.end||'')   : '';
@@ -360,6 +385,19 @@ function abrirModal(id) {
     resetarCoord();
   }
   document.getElementById('mb').classList.add('on');
+}
+
+var fotoBase64 = null;
+
+function carregarFoto(input) {
+  if (!input.files || !input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    fotoBase64 = e.target.result;
+    var prev = document.getElementById('fotoPreview');
+    prev.innerHTML = '<img src="' + fotoBase64 + '" style="width:100%;height:100%;object-fit:cover;border-radius:6px">';
+  };
+  reader.readAsDataURL(input.files[0]);
 }
 
 function fecharModal() {
@@ -398,7 +436,8 @@ function salvar() {
     status: document.getElementById('fSt').value,
     nota:   document.getElementById('fNota').value.trim(),
     lat:    coordPendente ? coordPendente[0] : null,
-    lng:    coordPendente ? coordPendente[1] : null
+    lng:    coordPendente ? coordPendente[1] : null,
+    foto:   fotoBase64 || null
   };
   if (editId) {
     var idx = obras.findIndex(function(x){ return x.id===editId; });
@@ -485,6 +524,7 @@ function renderObras() {
       + '<div class="card-nome">' + esc(o.nome) + '</div>'
       + '<span class="chip" style="' + SC[o.status] + '">' + SL[o.status] + '</span>'
       + '</div>'
+      + (o.foto ? '<img src="' + o.foto + '" style="width:100%;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px">' : '')
       + '<div class="card-info">'
       + (o.end  ? '📍 ' + esc(o.end)  + '<br>' : (o.lat ? '📍 pin no mapa<br>' : '<span style="color:#e05c6e">⚠️ Sem localização</span><br>'))
       + (o.tipo ? '🔧 ' + esc(o.tipo) + '<br>' : '')
